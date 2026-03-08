@@ -3,5 +3,6 @@ INFO:     Started server process [118361]
 INFO:     Waiting for application startup.
 INFO:     Application startup complete.
 ERROR:    [Errno 98] error while attempting to bind on address ('0.0.0.0INFO:     127.0.0.1:55426 - "GET /health HTTP/1.1" 200 OK
-lication shutdown.
-INFO:     Application shutdown complete.
+INFO:     127.0.0.1:35628 - "GET /health HTTP/1.1" 200 OK
+INFO:     127.0.0.1:54098 - "POST /v1/memories/ HTTP/1.1" 200 OK
+INFO:     127.0.0.1:59232 - "POST /v1/memories/search/ HTTP/1.1" 422 Unprocessable Entity

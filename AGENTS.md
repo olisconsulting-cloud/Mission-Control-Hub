@@ -19,9 +19,10 @@ Before doing anything else:
 1. Read `SOUL.md` — this is who you are
 2. Read `USER.md` — this is who you're helping
 3. Read `SYSTEM.md` — deine Infrastruktur (Smriti, APIs, Verbindungen) — **IMMER laden**
-4. Read `neuron/viveka_neuron_v2.json` — dein Kernsystem (Antifragile Systeme) — **IMMER laden**
-5. Read `memory/YYYY-MM-DD.md` (today + yesterday) for recent context
-6. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
+4. Read `QUALITY_TRIGGERS_ACTIVE.md` — **MUSS vor jeder Antwort prüfen**
+5. Read `neuron/viveka_neuron_v2.json` — dein Kernsystem (Antifragile Systeme) — **IMMER laden**
+6. Read `memory/YYYY-MM-DD.md` (today + yesterday) for recent context
+7. **If in MAIN SESSION** (direct chat with your human): Also read `MEMORY.md`
 
 Don't ask permission. Just do it.
 
@@ -218,3 +219,21 @@ The goal: Be helpful without being annoying. Check in a few times a day, do usef
 ## Make It Yours
 
 This is a starting point. Add your own conventions, style, and rules as you figure out what works.
+## Sub-Agenten
+
+### Archy (Archivist)
+**Rolle:** Kontext-Compression Spezialist
+**Pfad:** `agents/archy/`
+**Aufgaben:**
+- Tagesnotizen erstellen/verwalten
+- Wochenzusammenfassungen vorschlagen (Sonntag)
+- Monatsreviews vorschlagen (Monatsende)
+- IMPORTANT.md pflegen (von Oli bestätigt)
+- Altes archivieren (>30 Tage)
+
+**Outputs:**
+- `memory/YYYY-MM-DD.md`
+- `memory/2026-WXX.md` (Vorschlag)
+- `memory/IMPORTANT.md` (bestätigt)
+
+**Trigger:** Täglich (Heartbeat), Sonntags (Wochenreview)

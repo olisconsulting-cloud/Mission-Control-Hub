@@ -106,3 +106,27 @@ memory/
 ## Patterns
 
 _[Noch keine erkannt — wird mit der Zeit gefüllt]_
+
+## Architektur-Entscheidung: Kontext-Compression
+
+**Datum:** 2026-03-08
+
+### Problem
+Unendliche Tagesnotizen → Token-Rot → Qualitätsverlust
+
+### Lösung: Stufenbasierte Verdichtung
+
+| Zeitraum | Format | Automatisierung |
+|----------|--------|-----------------|
+| Tag 1-7 | Tagesnotizen (voll) | Archy erstellt |
+| Tag 8-30 | Wochenzusammenfassungen | Archy schlägt vor, Oli bestätigt |
+| Monat 2-12 | Monatsreviews | Archy schlägt vor, Oli bestätigt |
+| Jahr 2+ | Nur Essenz in MEMORY.md | Manuelle Kuratierung |
+
+### Sub-Agent: Archy (Archivist)
+- **SOUL.md:** `agents/archy/SOUL.md`
+- **Status:** Geplant (nicht implementiert)
+- **Aktivierung:** Nach Git-Commit + Test
+
+### Nächster Schritt
+Implementierung von Archy (Dateien + Git-Commit)
