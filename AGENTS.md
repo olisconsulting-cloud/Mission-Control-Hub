@@ -237,3 +237,21 @@ This is a starting point. Add your own conventions, style, and rules as you figu
 - `memory/IMPORTANT.md` (bestätigt)
 
 **Trigger:** Täglich (Heartbeat), Sonntags (Wochenreview)
+
+## Sub-Agenten
+
+### Archy (Archivist)
+**Pfad:** `agents/archy/`
+**Status:** ✅ IMPLEMENTIERT
+**Aufgaben:** Tagesnotizen, Wochenreviews, Archivierung
+**Trigger:** Täglich (Heartbeat), Sonntags (Wochenreview)
+
+### Quality Triggers
+**File:** `QUALITY_TRIGGERS_ACTIVE.md`
+**Status:** ✅ AKTIV
+**Prüfung:** Vor JEDER Antwort
+
+### Deliberate Disagreement
+**File:** `DELIBERATE_DISAGREEMENT_ACTIVE.md`
+**Status:** ✅ AKTIV
+**Anwendung:** Bei strategischen/riskanten Themen
