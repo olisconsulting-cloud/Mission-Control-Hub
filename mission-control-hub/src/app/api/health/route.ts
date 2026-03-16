@@ -1,47 +1,52 @@
 import { NextResponse } from "next/server"
+import { getPayload } from "payload"
+import config from "@/payload/payload.config"
+
+export const maxDuration = 60
 
 export async function GET(request: Request) {
   const url = new URL(request.url)
-  const migrate = url.searchParams.get("migrate")
+  const setup = url.searchParams.get("setup")
   
   const checks: Record<string, any> = {}
   checks.dbUrlSet = !!process.env.DATABASE_URL
 
   try {
-    const { getPayload } = await import("payload")
-    const config = (await import("@/payload/payload.config")).default
     const payload = await getPayload({ config })
-
-    if (migrate === "true") {
-      // Run migration
+    
+    if (setup === "true") {
       try {
-        await payload.db.migrate()
-        checks.migration = "completed"
-      } catch (migErr: any) {
-        // Try push instead
-        try {
-          await payload.db.push()
-          checks.migration = "pushed"
-        } catch (pushErr: any) {
-          checks.migration = { error: pushErr?.message?.substring(0, 300) }
+        // @ts-ignore - push exists on the db adapter
+        if (typeof payload.db.push === "function") {
+          await payload.db.push({ forceAcceptWarning: true })
+          checks.setup = "schema pushed successfully"
+        } else {
+          checks.setup = "push not available, trying createMigration"
+          await payload.db.createMigration({ forceAcceptWarning: true })
+          await payload.db.migrate()
+          checks.setup = "migration completed"
         }
+      } catch (setupErr: any) {
+        checks.setup = { error: setupErr?.message?.substring(0, 500) }
       }
     }
 
     try {
       const result = await payload.find({ collection: "users", limit: 1 })
-      checks.payload = { status: "connected", userCount: result.totalDocs }
+      checks.database = { status: "connected", userCount: result.totalDocs }
     } catch (queryErr: any) {
-      checks.payload = { status: "error", message: queryErr?.message?.substring(0, 300) }
+      checks.database = { status: "query_error", message: queryErr?.message?.substring(0, 300) }
     }
   } catch (error: any) {
-    checks.payload = { status: "init_error", message: error?.message?.substring(0, 500), stack: error?.stack?.substring(0, 300) }
+    checks.database = { status: "init_error", message: error?.message?.substring(0, 500) }
   }
 
+  const healthy = checks.database?.status === "connected"
+  
   return NextResponse.json({
-    status: checks.payload?.status === "connected" ? "healthy" : "unhealthy",
+    status: healthy ? "healthy" : "unhealthy",
     checks,
     timestamp: new Date().toISOString(),
-  }, { status: checks.payload?.status === "connected" ? 200 : 503 })
+  }, { status: healthy ? 200 : 503 })
 }
 
