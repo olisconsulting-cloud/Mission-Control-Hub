@@ -26,13 +26,14 @@ export default buildConfig({
       ],
     },
     {
-      slug: "spaces",
+      slug: "projects",
       admin: { useAsTitle: "name" },
       fields: [
         { name: "name", type: "text", required: true },
         { name: "description", type: "textarea" },
-        { name: "type", type: "select", defaultValue: "team", options: ["personal", "team", "project"] },
-        { name: "owner", type: "relationship", relationTo: "users", required: true },
+        { name: "customerName", type: "text", label: "Customer" },
+        { name: "status", type: "select", defaultValue: "active", options: ["active", "archived", "completed"] },
+        { name: "createdBy", type: "relationship", relationTo: "users" },
       ],
     },
     {
@@ -41,59 +42,35 @@ export default buildConfig({
       fields: [
         { name: "title", type: "text", required: true },
         { name: "description", type: "textarea" },
-        { name: "status", type: "select", defaultValue: "todo", options: ["backlog", "todo", "in_progress", "review", "done"] },
+        { name: "status", type: "select", defaultValue: "backlog", options: [
+          { label: "Backlog", value: "backlog" },
+          { label: "To Do", value: "todo" },
+          { label: "In Progress", value: "in_progress" },
+          { label: "Review", value: "review" },
+          { label: "Done", value: "done" },
+        ]},
         { name: "priority", type: "select", defaultValue: "medium", options: ["low", "medium", "high", "urgent"] },
+        { name: "project", type: "relationship", relationTo: "projects", required: true },
         { name: "assignee", type: "relationship", relationTo: "users" },
-        { name: "space", type: "relationship", relationTo: "spaces", required: true },
         { name: "dueDate", type: "date" },
       ],
     },
     {
-      slug: "teams",
-      admin: { useAsTitle: "name" },
-      fields: [
-        { name: "name", type: "text", required: true },
-        { name: "description", type: "textarea" },
-        { name: "owner", type: "relationship", relationTo: "users", required: true },
-      ],
-    },
-    {
-      slug: "agents",
-      admin: { useAsTitle: "name" },
-      fields: [
-        { name: "name", type: "text", required: true },
-        { name: "type", type: "select", options: ["openai", "anthropic", "custom"] },
-        { name: "model", type: "text" },
-        { name: "systemPrompt", type: "textarea" },
-        { name: "owner", type: "relationship", relationTo: "users", required: true },
-        { name: "space", type: "relationship", relationTo: "spaces" },
-        { name: "active", type: "checkbox", defaultValue: true },
-      ],
-    },
-    {
-      slug: "activities",
-      fields: [
-        { name: "user", type: "relationship", relationTo: "users" },
-        { name: "action", type: "text", required: true },
-        { name: "details", type: "json" },
-        { name: "space", type: "relationship", relationTo: "spaces" },
-      ],
-    },
-    {
-      slug: "notifications",
-      fields: [
-        { name: "recipient", type: "relationship", relationTo: "users", required: true },
-        { name: "title", type: "text", required: true },
-        { name: "message", type: "textarea" },
-        { name: "read", type: "checkbox", defaultValue: false },
-        { name: "type", type: "select", options: ["info", "warning", "error", "success"] },
-      ],
-    },
-    {
-      slug: "media",
+      slug: "files",
       upload: true,
+      admin: { useAsTitle: "filename" },
       fields: [
-        { name: "alt", type: "text" },
+        { name: "project", type: "relationship", relationTo: "projects", required: true },
+        { name: "uploadedBy", type: "relationship", relationTo: "users" },
+      ],
+    },
+    {
+      slug: "messages",
+      admin: { useAsTitle: "content" },
+      fields: [
+        { name: "content", type: "textarea", required: true },
+        { name: "project", type: "relationship", relationTo: "projects", required: true },
+        { name: "user", type: "relationship", relationTo: "users", required: true },
       ],
     },
   ],
@@ -102,9 +79,7 @@ export default buildConfig({
   typescript: { outputFile: path.resolve(dirname, "payload-types.ts") },
   db: postgresAdapter({
     pool: { connectionString: process.env.DATABASE_URL || "" },
-    push: true,
   }),
   sharp,
   plugins: [],
 })
-
