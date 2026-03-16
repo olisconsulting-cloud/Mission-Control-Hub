@@ -5,88 +5,102 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
-import { Users } from './collections/Users'
-import { Teams } from './collections/Teams'
-import { Spaces } from './collections/Spaces'
-import { Media } from './collections/Media'
-import { Tasks } from './collections/Tasks'
-import { Agents } from './collections/Agents'
-import { AgentUsage } from './collections/AgentUsage'
-import { Activities } from './collections/Activities'
-import { Notifications } from './collections/Notifications'
-import { Budgets } from './collections/Budgets'
-import { createPersonalSpace } from './hooks/createPersonalSpace'
-
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
-
-// Validate required environment variables
-if (!process.env.PAYLOAD_SECRET && !process.env.NEXTAUTH_SECRET) {
-  throw new Error('PAYLOAD_SECRET or NEXTAUTH_SECRET environment variable is required')
-}
-
-if (!process.env.DATABASE_URL) {
-  throw new Error('DATABASE_URL environment variable is required')
-}
-
-const UsersWithHooks = {
-  ...Users,
-  hooks: {
-    ...Users.hooks,
-    afterChange: [
-      ...(Users.hooks?.afterChange || []),
-      createPersonalSpace,
-    ],
-  },
-}
 
 export default buildConfig({
   admin: {
     user: 'users',
     importMap: {
-      baseDir: path.resolve(dirname),
-    },
-    meta: {
-      titleSuffix: '- Mission Control Hub',
-      favicon: '/favicon.ico',
-      ogImage: '/og-image.png',
+      baseDir: path.resolve(dirname, '..'),
     },
   },
   collections: [
-    UsersWithHooks, 
-    Teams, 
-    Spaces, 
-    Media, 
-    Tasks, 
-    Agents, 
-    AgentUsage, 
-    Activities, 
-    Notifications, 
-    Budgets
+    {
+      slug: 'users',
+      auth: true,
+      admin: { useAsTitle: 'email' },
+      fields: [
+        { name: 'name', type: 'text' },
+        { name: 'role', type: 'select', defaultValue: 'user', options: ['admin', 'user', 'guest'] },
+      ],
+    },
+    {
+      slug: 'spaces',
+      admin: { useAsTitle: 'name' },
+      fields: [
+        { name: 'name', type: 'text', required: true },
+        { name: 'description', type: 'textarea' },
+        { name: 'type', type: 'select', defaultValue: 'team', options: ['personal', 'team', 'project'] },
+        { name: 'owner', type: 'relationship', relationTo: 'users', required: true },
+      ],
+    },
+    {
+      slug: 'tasks',
+      admin: { useAsTitle: 'title' },
+      fields: [
+        { name: 'title', type: 'text', required: true },
+        { name: 'description', type: 'textarea' },
+        { name: 'status', type: 'select', defaultValue: 'todo', options: ['backlog', 'todo', 'in_progress', 'review', 'done'] },
+        { name: 'priority', type: 'select', defaultValue: 'medium', options: ['low', 'medium', 'high', 'urgent'] },
+        { name: 'assignee', type: 'relationship', relationTo: 'users' },
+        { name: 'space', type: 'relationship', relationTo: 'spaces', required: true },
+        { name: 'dueDate', type: 'date' },
+      ],
+    },
+    {
+      slug: 'teams',
+      admin: { useAsTitle: 'name' },
+      fields: [
+        { name: 'name', type: 'text', required: true },
+        { name: 'description', type: 'textarea' },
+        { name: 'owner', type: 'relationship', relationTo: 'users', required: true },
+      ],
+    },
+    {
+      slug: 'agents',
+      admin: { useAsTitle: 'name' },
+      fields: [
+        { name: 'name', type: 'text', required: true },
+        { name: 'type', type: 'select', options: ['openai', 'anthropic', 'custom'] },
+        { name: 'model', type: 'text' },
+        { name: 'systemPrompt', type: 'textarea' },
+        { name: 'owner', type: 'relationship', relationTo: 'users', required: true },
+        { name: 'space', type: 'relationship', relationTo: 'spaces' },
+        { name: 'active', type: 'checkbox', defaultValue: true },
+      ],
+    },
+    {
+      slug: 'activities',
+      fields: [
+        { name: 'user', type: 'relationship', relationTo: 'users' },
+        { name: 'action', type: 'text', required: true },
+        { name: 'details', type: 'json' },
+        { name: 'space', type: 'relationship', relationTo: 'spaces' },
+      ],
+    },
+    {
+      slug: 'notifications',
+      fields: [
+        { name: 'recipient', type: 'relationship', relationTo: 'users', required: true },
+        { name: 'title', type: 'text', required: true },
+        { name: 'message', type: 'textarea' },
+        { name: 'read', type: 'checkbox', defaultValue: false },
+        { name: 'type', type: 'select', options: ['info', 'warning', 'error', 'success'] },
+      ],
+    },
+    {
+      slug: 'media',
+      upload: true,
+      fields: [
+        { name: 'alt', type: 'text' },
+      ],
+    },
   ],
   editor: lexicalEditor(),
-  secret: process.env.PAYLOAD_SECRET || process.env.NEXTAUTH_SECRET || '',
-  typescript: {
-    outputFile: path.resolve(dirname, 'payload-types.ts'),
-  },
-  db: postgresAdapter({
-    pool: {
-      connectionString: process.env.DATABASE_URL,
-    },
-  }),
+  secret: process.env.PAYLOAD_SECRET || process.env.AUTH_SECRET || '',
+  typescript: { outputFile: path.resolve(dirname, 'payload-types.ts') },
+  db: postgresAdapter({ pool: { connectionString: process.env.DATABASE_URL || '' } }),
   sharp,
-  cors: [
-    process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-    ...(process.env.CORS_ORIGINS?.split(',') || []),
-  ].filter(Boolean),
-  csrf: [
-    process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
-    ...(process.env.CORS_ORIGINS?.split(',') || []),
-  ].filter(Boolean),
-  rateLimit: {
-    window: 15 * 60 * 1000, // 15 minutes
-    max: 100, // Max 100 requests per window per IP
-    trustProxy: true,
-  },
-  serverURL: process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000',
+  plugins: [],
 })
