@@ -1,0 +1,66 @@
+import { NextResponse, type NextRequest } from 'next/server'
+import { getPayload } from 'payload'
+import config from '@payload-config'
+import { auth } from '@/lib/auth'
+
+export async function GET(request: NextRequest) {
+  try {
+    const session = await auth()
+    if (!session?.user?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const days = parseInt(request.nextUrl.searchParams.get('days') || '30')
+    const since = new Date()
+    since.setDate(since.getDate() - days)
+
+    const payload = await getPayload({ config })
+
+    const usage = await payload.find({
+      collection: 'agent-usage',
+      where: {
+        user: { equals: session.user.id },
+        createdAt: { greater_than: since.toISOString() },
+      },
+      sort: '-createdAt',
+      limit: 1000,
+    })
+
+    // Aggregate by day
+    const dailyMap = new Map<string, { tokens: number; cost: number; calls: number }>()
+
+    for (const doc of usage.docs) {
+      const day = new Date(doc.createdAt).toISOString().split('T')[0]
+      const existing = dailyMap.get(day) || { tokens: 0, cost: 0, calls: 0 }
+      existing.tokens += (doc.inputTokens || 0) + (doc.outputTokens || 0)
+      existing.cost += doc.cost || 0
+      existing.calls += 1
+      dailyMap.set(day, existing)
+    }
+
+    // Aggregate by model
+    const modelMap = new Map<string, { tokens: number; cost: number; calls: number }>()
+    for (const doc of usage.docs) {
+      const model = doc.model || 'unknown'
+      const existing = modelMap.get(model) || { tokens: 0, cost: 0, calls: 0 }
+      existing.tokens += (doc.inputTokens || 0) + (doc.outputTokens || 0)
+      existing.cost += doc.cost || 0
+      existing.calls += 1
+      modelMap.set(model, existing)
+    }
+
+    const totalTokens = usage.docs.reduce((sum, d) => sum + (d.inputTokens || 0) + (d.outputTokens || 0), 0)
+    const totalCost = usage.docs.reduce((sum, d) => sum + (d.cost || 0), 0)
+
+    return NextResponse.json({
+      totalTokens,
+      totalCost,
+      totalCalls: usage.docs.length,
+      daily: Object.fromEntries(dailyMap),
+      byModel: Object.fromEntries(modelMap),
+    })
+  } catch (error) {
+    console.error('Failed to fetch usage:', error)
+    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+  }
+}

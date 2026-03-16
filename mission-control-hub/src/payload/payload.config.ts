@@ -14,6 +14,7 @@ import { Agents } from './collections/Agents'
 import { AgentUsage } from './collections/AgentUsage'
 import { Activities } from './collections/Activities'
 import { Notifications } from './collections/Notifications'
+import { Budgets } from './collections/Budgets'
 import { createPersonalSpace } from './hooks/createPersonalSpace'
 
 const filename = fileURLToPath(import.meta.url)
@@ -37,7 +38,7 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [UsersWithHooks, Teams, Spaces, Media, Tasks, Agents, AgentUsage, Activities, Notifications],
+  collections: [UsersWithHooks, Teams, Spaces, Media, Tasks, Agents, AgentUsage, Activities, Notifications, Budgets],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || process.env.NEXTAUTH_SECRET || 'default-secret-change-me',
   typescript: {
