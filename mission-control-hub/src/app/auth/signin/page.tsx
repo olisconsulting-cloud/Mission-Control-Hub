@@ -38,7 +38,8 @@ export default function SignInPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-neutral-950">
       <div className="w-full max-w-md p-8 rounded-2xl border border-neutral-800 bg-neutral-900">
-        <h1 className="text-2xl font-bold text-white mb-6 text-center">Sign In</h1>
+        <h1 className="text-2xl font-bold text-white mb-2 text-center">Welcome Back</h1>
+        <p className="text-neutral-400 text-center mb-6">Sign in to your account</p>
 
         {error && (
           <div className="mb-4 p-3 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
@@ -58,6 +59,7 @@ export default function SignInPage() {
               onChange={(e) => setEmail(e.target.value)}
               className="w-full px-4 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-white focus:outline-none focus:border-volt-500"
               required
+              placeholder="you@example.com"
             />
           </div>
 
@@ -72,6 +74,7 @@ export default function SignInPage() {
               onChange={(e) => setPassword(e.target.value)}
               className="w-full px-4 py-2 rounded-lg bg-neutral-800 border border-neutral-700 text-white focus:outline-none focus:border-volt-500"
               required
+              placeholder="••••••••"
             />
           </div>
 
@@ -90,7 +93,7 @@ export default function SignInPage() {
               <div className="w-full border-t border-neutral-700" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-neutral-900 text-neutral-400">Or</span>
+              <span className="px-2 bg-neutral-900 text-neutral-400">Or continue with</span>
             </div>
           </div>
 
@@ -104,7 +107,15 @@ export default function SignInPage() {
             Sign in with GitHub
           </button>
         </div>
+
+        <p className="mt-6 text-center text-sm text-neutral-400">
+          Don't have an account?{" "}
+          <a href="/auth/register" className="text-volt-400 hover:text-volt-300 font-medium">
+            Create one
+          </a>
+        </p>
       </div>
     </div>
   )
 }
+
