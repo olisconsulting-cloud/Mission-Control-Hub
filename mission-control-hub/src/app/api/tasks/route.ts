@@ -1,87 +1,56 @@
-import { NextResponse, type NextRequest } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@payload-config'
-import { requireAuth, requireSpaceAccess, handleAuthError } from '@/lib/authorization'
-import { validateBody, validateQuery, paginatedResponse, handleApiError } from '@/lib/validation'
-import { createTaskSchema } from '@/lib/validation/schemas'
+import { NextResponse } from "next/server"
+import { getPayload } from "payload"
+import config from "@/payload/payload.config"
 
-export async function GET(request: NextRequest) {
+export async function GET(request: Request) {
   try {
-    const session = await requireAuth()
-    const pagination = validateQuery(request)
-
-    const spaceId = request.nextUrl.searchParams.get('spaceId')
-    if (!spaceId) {
-      return NextResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'spaceId required' } }, { status: 400 })
-    }
-
-    // Check space access
-    await requireSpaceAccess(session.user.id, spaceId)
-
+    const { searchParams } = new URL(request.url)
+    const project = searchParams.get("project")
+    const status = searchParams.get("status")
+    
     const payload = await getPayload({ config })
     
+    let where: any = {}
+    if (project) where.project = { equals: parseInt(project) }
+    if (status) where.status = { equals: status }
+    
     const result = await payload.find({
-      collection: 'tasks',
-      where: { space: { equals: spaceId } },
-      sort: pagination.sort || 'order',
-      limit: pagination.limit,
-      page: pagination.page,
+      collection: "tasks",
+      where,
+      sort: "-updatedAt",
+      depth: 1,
     })
-
-    return paginatedResponse(result.docs, result.totalDocs, pagination)
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AuthError') {
-      return handleAuthError(error)
-    }
-    return handleApiError(error)
+    
+    return NextResponse.json({ tasks: result.docs })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-export async function POST(request: NextRequest) {
+export async function POST(request: Request) {
   try {
-    const session = await requireAuth()
-    const body = await validateBody(createTaskSchema, request)
-
-    // Check space access
-    await requireSpaceAccess(session.user.id, body.spaceId)
-
-    const payload = await getPayload({ config })
-
-    // Get next order number
-    const existing = await payload.find({
-      collection: 'tasks',
-      where: {
-        space: { equals: body.spaceId },
-        status: { equals: body.status || 'todo' },
-      },
-      sort: '-order',
-      limit: 1,
-    })
-
-    const nextOrder = existing.docs.length > 0 ? (existing.docs[0].order || 0) + 1 : 0
-
-    const task = await payload.create({
-      collection: 'tasks',
-      data: {
-        title: body.title,
-        description: body.description,
-        status: body.status,
-        priority: body.priority,
-        space: body.spaceId,
-        assignee: body.assignee || undefined,
-        dueDate: body.dueDate,
-        tags: body.tags,
-        estimatedHours: body.estimatedHours,
-        order: nextOrder,
-        createdBy: session.user.id,
-      },
-    })
-
-    return NextResponse.json(task, { status: 201 })
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AuthError') {
-      return handleAuthError(error)
+    const body = await request.json()
+    const { title, description, project, status = "todo", priority = "medium" } = body
+    
+    if (!title || !project) {
+      return NextResponse.json({ error: "Title and project required" }, { status: 400 })
     }
-    return handleApiError(error)
+    
+    const payload = await getPayload({ config })
+    
+    const task = await payload.create({
+      collection: "tasks",
+      data: {
+        title,
+        description,
+        project,
+        status,
+        priority,
+      },
+    })
+    
+    return NextResponse.json({ task })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
