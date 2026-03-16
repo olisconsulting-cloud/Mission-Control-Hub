@@ -11,9 +11,7 @@ const dirname = path.dirname(filename)
 export default buildConfig({
   admin: {
     user: "users",
-    importMap: {
-      baseDir: path.resolve(dirname, ".."),
-    },
+    importMap: { baseDir: path.resolve(dirname, "..") },
   },
   collections: [
     {
@@ -22,7 +20,7 @@ export default buildConfig({
       admin: { useAsTitle: "email" },
       fields: [
         { name: "name", type: "text" },
-        { name: "role", type: "select", defaultValue: "user", options: ["admin", "user", "guest"] },
+        { name: "role", type: "select", defaultValue: "user", options: ["admin", "user"] },
       ],
     },
     {
@@ -31,9 +29,8 @@ export default buildConfig({
       fields: [
         { name: "name", type: "text", required: true },
         { name: "description", type: "textarea" },
-        { name: "customerName", type: "text", label: "Customer" },
-        { name: "status", type: "select", defaultValue: "active", options: ["active", "archived", "completed"] },
-        { name: "createdBy", type: "relationship", relationTo: "users" },
+        { name: "customerName", type: "text" },
+        { name: "status", type: "select", defaultValue: "active", options: ["active", "archived"] },
       ],
     },
     {
@@ -42,26 +39,9 @@ export default buildConfig({
       fields: [
         { name: "title", type: "text", required: true },
         { name: "description", type: "textarea" },
-        { name: "status", type: "select", defaultValue: "backlog", options: [
-          { label: "Backlog", value: "backlog" },
-          { label: "To Do", value: "todo" },
-          { label: "In Progress", value: "in_progress" },
-          { label: "Review", value: "review" },
-          { label: "Done", value: "done" },
-        ]},
+        { name: "status", type: "select", defaultValue: "todo", options: ["backlog", "todo", "in_progress", "review", "done"] },
         { name: "priority", type: "select", defaultValue: "medium", options: ["low", "medium", "high", "urgent"] },
         { name: "project", type: "relationship", relationTo: "projects", required: true },
-        { name: "assignee", type: "relationship", relationTo: "users" },
-        { name: "dueDate", type: "date" },
-      ],
-    },
-    {
-      slug: "files",
-      upload: true,
-      admin: { useAsTitle: "filename" },
-      fields: [
-        { name: "project", type: "relationship", relationTo: "projects", required: true },
-        { name: "uploadedBy", type: "relationship", relationTo: "users" },
       ],
     },
     {
@@ -74,12 +54,20 @@ export default buildConfig({
       ],
     },
   ],
+  upload: {
+    collections: {
+      files: {
+        fields: [
+          { name: "project", type: "relationship", relationTo: "projects", required: true },
+        ],
+      },
+    },
+  },
   editor: lexicalEditor(),
-  secret: process.env.PAYLOAD_SECRET || process.env.AUTH_SECRET || "",
+  secret: process.env.AUTH_SECRET || "",
   typescript: { outputFile: path.resolve(dirname, "payload-types.ts") },
   db: postgresAdapter({
     pool: { connectionString: process.env.DATABASE_URL || "" },
   }),
   sharp,
-  plugins: [],
 })
