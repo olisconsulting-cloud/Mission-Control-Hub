@@ -1,44 +1,36 @@
-import { NextResponse } from 'next/server'
-import { getPayload } from 'payload'
-import config from '@/payload/payload.config'
-import { redis, isRedisAvailable } from '@/lib/redis'
+import { NextResponse } from "next/server"
 
 export async function GET() {
-  const checks: Record<string, { status: string; latencyMs?: number }> = {}
+  const checks: Record<string, any> = {}
   
-  // Database check
+  // Check DATABASE_URL exists
+  checks.dbUrlSet = !!process.env.DATABASE_URL
+  checks.dbUrlPrefix = process.env.DATABASE_URL?.substring(0, 30) + "..."
+
+  // Try Payload
   try {
-    const start = Date.now()
+    const { getPayload } = await import("payload")
+    const config = (await import("@/payload/payload.config")).default
     const payload = await getPayload({ config })
-    await payload.find({ collection: 'users', limit: 1 })
-    checks.database = { status: 'healthy', latencyMs: Date.now() - start }
-  } catch {
-    checks.database = { status: 'unhealthy' }
-  }
-  
-  // Redis check
-  try {
-    if (redis && isRedisAvailable()) {
-      const start = Date.now()
-      await redis.ping()
-      checks.redis = { status: 'healthy', latencyMs: Date.now() - start }
-    } else {
-      checks.redis = { status: 'unavailable' }
+    
+    // Try a simple query
+    const result = await payload.find({ collection: "users", limit: 1 })
+    checks.payload = { status: "connected", userCount: result.totalDocs }
+  } catch (error: any) {
+    checks.payload = { 
+      status: "error", 
+      message: error?.message?.substring(0, 500),
+      name: error?.name,
+      code: error?.code 
     }
-  } catch {
-    checks.redis = { status: 'unhealthy' }
   }
+
+  const healthy = checks.payload?.status === "connected"
   
-  const allHealthy = Object.values(checks).every(c => c.status === 'healthy')
-  const anyUnhealthy = Object.values(checks).some(c => c.status === 'unhealthy')
-  
-  return NextResponse.json(
-    {
-      status: anyUnhealthy ? 'unhealthy' : allHealthy ? 'healthy' : 'degraded',
-      checks,
-      uptime: process.uptime(),
-      timestamp: new Date().toISOString(),
-    },
-    { status: anyUnhealthy ? 503 : 200 }
-  )
+  return NextResponse.json({
+    status: healthy ? "healthy" : "unhealthy",
+    checks,
+    timestamp: new Date().toISOString(),
+  }, { status: healthy ? 200 : 503 })
 }
+
