@@ -5,8 +5,26 @@ import path from 'path'
 import { fileURLToPath } from 'url'
 import sharp from 'sharp'
 
+import { Users } from './collections/Users'
+import { Teams } from './collections/Teams'
+import { Spaces } from './collections/Spaces'
+import { Media } from './collections/Media'
+import { createPersonalSpace } from './hooks/createPersonalSpace'
+
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
+
+// Add hook to Users collection
+const UsersWithHooks = {
+  ...Users,
+  hooks: {
+    ...Users.hooks,
+    afterChange: [
+      ...(Users.hooks?.afterChange || []),
+      createPersonalSpace,
+    ],
+  },
+}
 
 export default buildConfig({
   admin: {
@@ -15,22 +33,7 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [
-    {
-      slug: 'users',
-      auth: true,
-      fields: [
-        { name: 'role', type: 'select', options: ['admin', 'user'], defaultValue: 'user' },
-      ],
-    },
-    {
-      slug: 'media',
-      upload: true,
-      fields: [
-        { name: 'alt', type: 'text' },
-      ],
-    },
-  ],
+  collections: [UsersWithHooks, Teams, Spaces, Media],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || process.env.NEXTAUTH_SECRET || 'default-secret-change-me',
   typescript: {
