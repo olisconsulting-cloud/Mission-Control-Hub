@@ -1,36 +1,47 @@
 import { NextResponse } from "next/server"
 
-export async function GET() {
-  const checks: Record<string, any> = {}
+export async function GET(request: Request) {
+  const url = new URL(request.url)
+  const migrate = url.searchParams.get("migrate")
   
-  // Check DATABASE_URL exists
+  const checks: Record<string, any> = {}
   checks.dbUrlSet = !!process.env.DATABASE_URL
-  checks.dbUrlPrefix = process.env.DATABASE_URL?.substring(0, 30) + "..."
 
-  // Try Payload
   try {
     const { getPayload } = await import("payload")
     const config = (await import("@/payload/payload.config")).default
     const payload = await getPayload({ config })
-    
-    // Try a simple query
-    const result = await payload.find({ collection: "users", limit: 1 })
-    checks.payload = { status: "connected", userCount: result.totalDocs }
-  } catch (error: any) {
-    checks.payload = { 
-      status: "error", 
-      message: error?.message?.substring(0, 500),
-      name: error?.name,
-      code: error?.code 
+
+    if (migrate === "true") {
+      // Run migration
+      try {
+        await payload.db.migrate()
+        checks.migration = "completed"
+      } catch (migErr: any) {
+        // Try push instead
+        try {
+          await payload.db.push()
+          checks.migration = "pushed"
+        } catch (pushErr: any) {
+          checks.migration = { error: pushErr?.message?.substring(0, 300) }
+        }
+      }
     }
+
+    try {
+      const result = await payload.find({ collection: "users", limit: 1 })
+      checks.payload = { status: "connected", userCount: result.totalDocs }
+    } catch (queryErr: any) {
+      checks.payload = { status: "error", message: queryErr?.message?.substring(0, 300) }
+    }
+  } catch (error: any) {
+    checks.payload = { status: "init_error", message: error?.message?.substring(0, 500), stack: error?.stack?.substring(0, 300) }
   }
 
-  const healthy = checks.payload?.status === "connected"
-  
   return NextResponse.json({
-    status: healthy ? "healthy" : "unhealthy",
+    status: checks.payload?.status === "connected" ? "healthy" : "unhealthy",
     checks,
     timestamp: new Date().toISOString(),
-  }, { status: healthy ? 200 : 503 })
+  }, { status: checks.payload?.status === "connected" ? 200 : 503 })
 }
 
