@@ -54,6 +54,13 @@ export default async function DashboardLayout({
             <span>Agents</span>
           </Link>
           <Link
+            href="/dashboard/activity"
+            className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-800 transition-colors"
+          >
+            <span>📜</span>
+            <span>Activity</span>
+          </Link>
+          <Link
             href="/dashboard/teams"
             className="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-surface-800 transition-colors"
           >
