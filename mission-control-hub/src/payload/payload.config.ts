@@ -10,12 +10,13 @@ import { Teams } from './collections/Teams'
 import { Spaces } from './collections/Spaces'
 import { Media } from './collections/Media'
 import { Tasks } from './collections/Tasks'
+import { Agents } from './collections/Agents'
+import { AgentUsage } from './collections/AgentUsage'
 import { createPersonalSpace } from './hooks/createPersonalSpace'
 
 const filename = fileURLToPath(import.meta.url)
 const dirname = path.dirname(filename)
 
-// Add hook to Users collection
 const UsersWithHooks = {
   ...Users,
   hooks: {
@@ -34,7 +35,7 @@ export default buildConfig({
       baseDir: path.resolve(dirname),
     },
   },
-  collections: [UsersWithHooks, Teams, Spaces, Media, Tasks],
+  collections: [UsersWithHooks, Teams, Spaces, Media, Tasks, Agents, AgentUsage],
   editor: lexicalEditor(),
   secret: process.env.PAYLOAD_SECRET || process.env.NEXTAUTH_SECRET || 'default-secret-change-me',
   typescript: {
