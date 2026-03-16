@@ -6,8 +6,17 @@ const inter = Inter({ subsets: ['latin'], variable: '--font-inter' })
 const spaceGrotesk = Space_Grotesk({ subsets: ['latin'], variable: '--font-space' })
 
 export const metadata: Metadata = {
-  title: 'Mission Control Hub',
-  description: 'AI-powered mission control for teams',
+  title: {
+    default: 'Mission Control Hub',
+    template: '%s | Mission Control Hub',
+  },
+  description: 'AI-powered mission control for teams. Manage agents, track tasks, ship faster.',
+  keywords: ['AI', 'mission control', 'project management', 'kanban', 'agents'],
+  openGraph: {
+    title: 'Mission Control Hub',
+    description: 'AI-powered mission control for teams',
+    type: 'website',
+  },
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
