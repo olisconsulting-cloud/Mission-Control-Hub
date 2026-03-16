@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { AgentChat } from '@/components/agents/AgentChat'
+import { CardSkeleton } from '@/components/ui/Skeleton'
 
 interface Agent {
   id: string
@@ -16,19 +17,46 @@ export default function AgentsPage() {
   const [agents, setAgents] = useState<Agent[]>([])
   const [selected, setSelected] = useState<Agent | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/agents')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load agents')
+        return res.json()
+      })
       .then(data => {
         setAgents(data.docs || [])
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(err => {
+        setError(err.message)
+        setLoading(false)
+      })
   }, [])
 
   if (loading) {
-    return <div className="animate-pulse h-96 rounded-xl bg-surface-900" />
+    return (
+      <div className="grid grid-cols-12 gap-6">
+        <div className="col-span-4 space-y-3">
+          <CardSkeleton />
+          <CardSkeleton />
+          <CardSkeleton />
+        </div>
+        <div className="col-span-8">
+          <CardSkeleton />
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl bg-surface-900 border border-red-500/30 p-8 text-center">
+        <p className="text-3xl mb-4">⚠️</p>
+        <p className="text-red-400">{error}</p>
+      </div>
+    )
   }
 
   return (
@@ -44,7 +72,7 @@ export default function AgentsPage() {
         {/* Agent List */}
         <div className="col-span-4 space-y-3">
           {agents.length === 0 ? (
-            <div className="text-center py-12 text-muted">
+            <div className="rounded-xl bg-surface-900 border border-surface-800 p-12 text-center text-muted">
               <p className="text-4xl mb-4">🤖</p>
               <p className="text-sm">No agents yet.</p>
               <p className="text-xs mt-2">Create one via the Admin Panel → Agents</p>

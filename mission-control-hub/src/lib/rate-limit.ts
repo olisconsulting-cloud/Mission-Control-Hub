@@ -1,40 +1,56 @@
-// Simple in-memory rate limiter (for serverless, use Redis in production)
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>()
+import { redis } from './redis'
+import { NextResponse } from 'next/server'
 
 interface RateLimitConfig {
-  windowMs?: number
-  maxRequests?: number
+  windowMs: number
+  maxRequests: number
+  keyPrefix?: string
 }
 
-export function checkRateLimit(
-  key: string,
-  config: RateLimitConfig = {}
-): { allowed: boolean; remaining: number; resetIn: number } {
-  const { windowMs = 60000, maxRequests = 60 } = config
-  const now = Date.now()
-
-  const entry = rateLimitMap.get(key)
-
-  if (!entry || now > entry.resetTime) {
-    rateLimitMap.set(key, { count: 1, resetTime: now + windowMs })
-    return { allowed: true, remaining: maxRequests - 1, resetIn: windowMs }
-  }
-
-  entry.count++
-
-  if (entry.count > maxRequests) {
-    return { allowed: false, remaining: 0, resetIn: entry.resetTime - now }
-  }
-
-  return { allowed: true, remaining: maxRequests - entry.count, resetIn: entry.resetTime - now }
+const defaultConfig: RateLimitConfig = {
+  windowMs: 60_000,
+  maxRequests: 60,
+  keyPrefix: 'rl',
 }
 
-// Cleanup old entries every 5 minutes
-setInterval(() => {
+export async function checkRateLimit(
+  identifier: string,
+  config: Partial<RateLimitConfig> = {}
+): Promise<{ allowed: boolean; remaining: number; resetAt: number }> {
+  const { windowMs, maxRequests, keyPrefix } = { ...defaultConfig, ...config }
+  
+  if (!redis) {
+    // Fallback: allow if Redis unavailable
+    return { allowed: true, remaining: maxRequests, resetAt: Date.now() + windowMs }
+  }
+  
+  const key = `${keyPrefix}:${identifier}`
   const now = Date.now()
-  for (const [key, entry] of rateLimitMap) {
-    if (now > entry.resetTime) {
-      rateLimitMap.delete(key)
+  const windowStart = now - windowMs
+  
+  const pipeline = redis.pipeline()
+  pipeline.zremrangebyscore(key, 0, windowStart)
+  pipeline.zadd(key, now.toString(), `${now}-${Math.random()}`)
+  pipeline.zcard(key)
+  pipeline.expire(key, Math.ceil(windowMs / 1000))
+  
+  const results = await pipeline.exec()
+  const count = (results?.[2]?.[1] as number) || 0
+  const allowed = count <= maxRequests
+  
+  return {
+    allowed,
+    remaining: Math.max(0, maxRequests - count),
+    resetAt: now + windowMs,
+  }
+}
+
+export function rateLimitResponse(resetAt: number) {
+  return NextResponse.json(
+    { error: { code: 'RATE_LIMITED', message: 'Too many requests' } },
+    {
+      status: 429,
+      headers: { 'Retry-After': Math.ceil((resetAt - Date.now()) / 1000).toString() },
     }
-  }
-}, 300000)
+  )
+}

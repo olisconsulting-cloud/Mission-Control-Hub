@@ -1,25 +1,35 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { auth } from '@/lib/auth'
+import { requireAuth, handleAuthError } from '@/lib/authorization'
+import { validateQuery, paginatedResponse, handleApiError } from '@/lib/validation'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
+    const pagination = validateQuery(request)
+    const spaceId = request.nextUrl.searchParams.get('spaceId')
 
     const payload = await getPayload({ config })
-    const activities = await payload.find({
+
+    // Build where clause - space-scoped or user-scoped
+    const where = spaceId 
+      ? { space: { equals: spaceId } }
+      : undefined // All activities for spaces user has access to
+
+    const result = await payload.find({
       collection: 'activities',
-      sort: '-createdAt',
-      limit: 50,
+      where,
+      sort: pagination.sort || '-createdAt',
+      limit: pagination.limit,
+      page: pagination.page,
     })
 
-    return NextResponse.json(activities)
+    return paginatedResponse(result.docs, result.totalDocs, pagination)
   } catch (error) {
-    console.error('Failed to fetch activities:', error)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error)
+    }
+    return handleApiError(error)
   }
 }

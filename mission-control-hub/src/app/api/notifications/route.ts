@@ -1,26 +1,37 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { auth } from '@/lib/auth'
+import { requireAuth, handleAuthError } from '@/lib/authorization'
+import { validateQuery, paginatedResponse, handleApiError } from '@/lib/validation'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
+    const pagination = validateQuery(request)
+    const unreadOnly = request.nextUrl.searchParams.get('unread') === 'true'
 
     const payload = await getPayload({ config })
-    const notifications = await payload.find({
+    
+    // User-scoped: only fetch notifications for current user
+    const where: any = { user: { equals: session.user.id } }
+    
+    if (unreadOnly) {
+      where.read = { equals: false }
+    }
+
+    const result = await payload.find({
       collection: 'notifications',
-      where: { user: { equals: session.user.id } },
-      sort: '-createdAt',
-      limit: 20,
+      where,
+      sort: pagination.sort || '-createdAt',
+      limit: pagination.limit,
+      page: pagination.page,
     })
 
-    return NextResponse.json(notifications)
+    return paginatedResponse(result.docs, result.totalDocs, pagination)
   } catch (error) {
-    console.error('Failed to fetch notifications:', error)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error)
+    }
+    return handleApiError(error)
   }
 }

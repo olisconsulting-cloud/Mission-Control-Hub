@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { KanbanBoard } from '@/components/kanban/KanbanBoard'
+import { BoardSkeleton } from '@/components/ui/Skeleton'
 
 interface Space {
   id: string
@@ -13,21 +14,37 @@ export default function BoardPage() {
   const [spaces, setSpaces] = useState<Space[]>([])
   const [selectedSpace, setSelectedSpace] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/spaces')
-      .then(res => res.json())
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load spaces')
+        return res.json()
+      })
       .then(data => {
         const docs = data.docs || []
         setSpaces(docs)
         if (docs.length > 0) setSelectedSpace(docs[0].id)
         setLoading(false)
       })
-      .catch(() => setLoading(false))
+      .catch(err => {
+        setError(err.message)
+        setLoading(false)
+      })
   }, [])
 
   if (loading) {
-    return <div className="animate-pulse h-96 rounded-xl bg-surface-900" />
+    return <BoardSkeleton />
+  }
+
+  if (error) {
+    return (
+      <div className="rounded-xl bg-surface-900 border border-red-500/30 p-8 text-center">
+        <p className="text-3xl mb-4">⚠️</p>
+        <p className="text-red-400">{error}</p>
+      </div>
+    )
   }
 
   return (
@@ -58,9 +75,10 @@ export default function BoardPage() {
       {selectedSpace ? (
         <KanbanBoard spaceId={selectedSpace} />
       ) : (
-        <div className="text-center py-12 text-muted">
+        <div className="rounded-xl bg-surface-900 border border-surface-800 p-12 text-center text-muted">
           <p className="text-4xl mb-4">📋</p>
           <p>Create a space first to start using the board.</p>
+          <p className="text-xs mt-2">Go to Spaces → Create New Space</p>
         </div>
       )}
     </div>

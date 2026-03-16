@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ChartSkeleton } from '@/components/ui/Skeleton'
 
 interface AnalyticsData {
   tasks: {
@@ -32,17 +33,55 @@ const statusLabels: Record<string, { label: string; color: string }> = {
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/analytics')
-      .then(res => res.json())
-      .then(d => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
+      .then(res => {
+        if (!res.ok) throw new Error('Failed to load analytics')
+        return res.json()
+      })
+      .then(d => { 
+        setData(d)
+        setLoading(false)
+      })
+      .catch(err => {
+        setError(err.message)
+        setLoading(false)
+      })
   }, [])
 
-  if (loading) return <div className="animate-pulse h-96 rounded-xl bg-surface-900" />
+  if (loading) {
+    return (
+      <div className="space-y-8">
+        <ChartSkeleton />
+        <div className="grid grid-cols-4 gap-4">
+          <ChartSkeleton />
+          <ChartSkeleton />
+          <ChartSkeleton />
+          <ChartSkeleton />
+        </div>
+      </div>
+    )
+  }
 
-  if (!data) return <p className="text-muted">Failed to load analytics.</p>
+  if (error) {
+    return (
+      <div className="rounded-xl bg-surface-900 border border-red-500/30 p-8 text-center">
+        <p className="text-3xl mb-4">⚠️</p>
+        <p className="text-red-400">{error}</p>
+      </div>
+    )
+  }
+
+  if (!data) {
+    return (
+      <div className="rounded-xl bg-surface-900 border border-surface-800 p-12 text-center">
+        <p className="text-4xl mb-4">📊</p>
+        <p className="text-muted">No analytics data available yet.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-8">

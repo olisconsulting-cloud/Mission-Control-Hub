@@ -35,10 +35,12 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
   return (
     <div
       ref={setNodeRef}
+      role="article"
       style={style}
       {...attributes}
       {...listeners}
       className="p-3 rounded-lg bg-void border border-surface-800 hover:border-surface-700 cursor-grab active:cursor-grabbing group transition-colors"
+      onKeyDown={(e) => e.key === 'Delete' && onDelete?.(task.id)}
     >
       <div className="flex items-start justify-between gap-2">
         <h4 className="text-sm font-medium leading-tight">{task.title}</h4>
@@ -48,7 +50,8 @@ export function TaskCard({ task, onDelete }: TaskCardProps) {
               e.stopPropagation()
               onDelete(task.id)
             }}
-            className="opacity-0 group-hover:opacity-100 text-muted hover:text-red-400 text-xs transition-opacity"
+            className="opacity-100 md:opacity-0 md:group-hover:opacity-100 text-muted hover:text-red-400 text-xs transition-opacity"
+            aria-label={`Delete task ${task.title}`}
           >
             ✕
           </button>

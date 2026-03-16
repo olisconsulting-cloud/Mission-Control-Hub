@@ -1,14 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { auth } from '@/lib/auth'
+import { requireAuth, handleAuthError } from '@/lib/authorization'
+import { handleApiError } from '@/lib/validation'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
 
     const days = parseInt(request.nextUrl.searchParams.get('days') || '30')
     const since = new Date()
@@ -16,6 +14,7 @@ export async function GET(request: NextRequest) {
 
     const payload = await getPayload({ config })
 
+    // User-scoped: only fetch usage for current user
     const usage = await payload.find({
       collection: 'agent-usage',
       where: {
@@ -60,7 +59,9 @@ export async function GET(request: NextRequest) {
       byModel: Object.fromEntries(modelMap),
     })
   } catch (error) {
-    console.error('Failed to fetch usage:', error)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error)
+    }
+    return handleApiError(error)
   }
 }

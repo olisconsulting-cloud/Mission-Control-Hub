@@ -1,43 +1,50 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { auth } from '@/lib/auth'
+import { requireAuth, requireSpaceAccess, handleAuthError } from '@/lib/authorization'
+import { validateBody, validateQuery, paginatedResponse, handleApiError } from '@/lib/validation'
+import { createTaskSchema } from '@/lib/validation/schemas'
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
+    const pagination = validateQuery(request)
 
     const spaceId = request.nextUrl.searchParams.get('spaceId')
     if (!spaceId) {
-      return NextResponse.json({ error: 'spaceId required' }, { status: 400 })
+      return NextResponse.json({ error: { code: 'VALIDATION_ERROR', message: 'spaceId required' } }, { status: 400 })
     }
 
+    // Check space access
+    await requireSpaceAccess(session.user.id, spaceId)
+
     const payload = await getPayload({ config })
-    const tasks = await payload.find({
+    
+    const result = await payload.find({
       collection: 'tasks',
       where: { space: { equals: spaceId } },
-      sort: 'order',
-      limit: 500,
+      sort: pagination.sort || 'order',
+      limit: pagination.limit,
+      page: pagination.page,
     })
 
-    return NextResponse.json(tasks)
+    return paginatedResponse(result.docs, result.totalDocs, pagination)
   } catch (error) {
-    console.error('Failed to fetch tasks:', error)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error)
+    }
+    return handleApiError(error)
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
+    const body = await validateBody(createTaskSchema, request)
 
-    const body = await request.json()
+    // Check space access
+    await requireSpaceAccess(session.user.id, body.spaceId)
+
     const payload = await getPayload({ config })
 
     // Get next order number
@@ -45,7 +52,7 @@ export async function POST(request: Request) {
       collection: 'tasks',
       where: {
         space: { equals: body.spaceId },
-        status: { equals: body.status || 'backlog' },
+        status: { equals: body.status || 'todo' },
       },
       sort: '-order',
       limit: 1,
@@ -57,17 +64,24 @@ export async function POST(request: Request) {
       collection: 'tasks',
       data: {
         title: body.title,
-        status: body.status || 'backlog',
-        priority: body.priority || 'medium',
+        description: body.description,
+        status: body.status,
+        priority: body.priority,
         space: body.spaceId,
         assignee: body.assignee || undefined,
+        dueDate: body.dueDate,
+        tags: body.tags,
+        estimatedHours: body.estimatedHours,
         order: nextOrder,
+        createdBy: session.user.id,
       },
     })
 
     return NextResponse.json(task, { status: 201 })
   } catch (error) {
-    console.error('Failed to create task:', error)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error)
+    }
+    return handleApiError(error)
   }
 }

@@ -23,6 +23,7 @@ export function KanbanColumn({ id, title, icon, tasks, wipLimit, onDeleteTask }:
       className={`flex flex-col w-72 min-w-[18rem] shrink-0 rounded-xl bg-surface-900 border transition-colors ${
         isOver ? 'border-volt-500' : 'border-surface-800'
       }`}
+      aria-label={`${title} column, ${tasks.length} tasks`}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-800">
@@ -50,7 +51,7 @@ export function KanbanColumn({ id, title, icon, tasks, wipLimit, onDeleteTask }:
 
         {tasks.length === 0 && (
           <div className="flex items-center justify-center h-20 text-xs text-muted">
-            Drop tasks here
+            No tasks in this column
           </div>
         )}
       </div>

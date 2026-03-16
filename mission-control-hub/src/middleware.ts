@@ -5,19 +5,28 @@ import { getToken } from 'next-auth/jwt'
 export async function middleware(request: NextRequest) {
   const response = NextResponse.next()
 
-  // Security Headers (CSP, XSS, etc.)
+  // Generate a unique nonce for this request
+  const nonce = Buffer.from(crypto.randomUUID()).toString('base64')
+  
+  // Security Headers with nonce-based CSP
   response.headers.set('X-Frame-Options', 'DENY')
   response.headers.set('X-Content-Type-Options', 'nosniff')
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
   response.headers.set('X-XSS-Protection', '1; mode=block')
+  
+  // Strict CSP with nonces (removed unsafe-inline and unsafe-eval)
   response.headers.set(
     'Content-Security-Policy',
-    "default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:;"
+    `default-src 'self'; script-src 'self' 'nonce-${nonce}' https://cdn.jsdelivr.net; style-src 'self' 'nonce-${nonce}' https://fonts.googleapis.com; img-src 'self' data: https:; font-src 'self' https://fonts.gstatic.com; connect-src 'self' https:; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; upgrade-insecure-requests;`
   )
   response.headers.set(
     'Permissions-Policy',
     'camera=(), microphone=(), geolocation=()'
   )
+  
+  // Store nonce in request headers for use in pages
+  const requestHeaders = new Headers(request.headers)
+  requestHeaders.set('x-csp-nonce', nonce)
 
   // Auth check for dashboard routes
   if (request.nextUrl.pathname.startsWith('/dashboard')) {

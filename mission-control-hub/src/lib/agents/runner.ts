@@ -1,6 +1,7 @@
 import { createOpenAI } from '@ai-sdk/openai'
 import { createAnthropic } from '@ai-sdk/anthropic'
 import { streamText, generateText } from 'ai'
+import { validateWebhookUrl } from '@/lib/url-validator'
 
 interface AgentConfig {
   provider: 'openai' | 'anthropic' | 'webhook'
@@ -16,6 +17,7 @@ interface AgentConfig {
 
 interface RunOptions {
   messages: Array<{ role: 'user' | 'assistant' | 'system'; content: string }>
+  context?: Record<string, unknown>
   stream?: boolean
 }
 
@@ -70,10 +72,19 @@ async function runWebhookAgent(agent: AgentConfig, options: RunOptions) {
   const url = agent.config.webhookUrl
   if (!url) throw new Error('Webhook URL not configured')
 
+  // SSRF Protection: Validate webhook URL before making request
+  const validation = validateWebhookUrl(url)
+  if (!validation.valid) {
+    throw new Error(`Invalid webhook URL: ${validation.reason}`)
+  }
+
   const res = await fetch(url, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ messages: options.messages }),
+    body: JSON.stringify({ 
+      messages: options.messages,
+      context: options.context,
+    }),
   })
 
   if (!res.ok) {

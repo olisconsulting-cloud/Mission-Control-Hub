@@ -1,17 +1,17 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { auth } from '@/lib/auth'
+import { requireAuth, handleAuthError } from '@/lib/authorization'
+import { validateBody, validateQuery, paginatedResponse, handleApiError } from '@/lib/validation'
+import { createTeamSchema } from '@/lib/validation/schemas'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
+    const pagination = validateQuery(request)
 
     const payload = await getPayload({ config })
-    const teams = await payload.find({
+    const result = await payload.find({
       collection: 'teams',
       where: {
         or: [
@@ -19,24 +19,25 @@ export async function GET() {
           { 'members.user': { equals: session.user.id } },
         ],
       },
-      sort: '-createdAt',
+      sort: pagination.sort || '-createdAt',
+      limit: pagination.limit,
+      page: pagination.page,
     })
 
-    return NextResponse.json(teams)
+    return paginatedResponse(result.docs, result.totalDocs, pagination)
   } catch (error) {
-    console.error('Failed to fetch teams:', error)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error)
+    }
+    return handleApiError(error)
   }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
+    const body = await validateBody(createTeamSchema, request)
 
-    const body = await request.json()
     const payload = await getPayload({ config })
 
     const team = await payload.create({
@@ -51,7 +52,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json(team, { status: 201 })
   } catch (error) {
-    console.error('Failed to create team:', error)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error)
+    }
+    return handleApiError(error)
   }
 }

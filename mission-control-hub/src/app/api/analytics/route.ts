@@ -1,19 +1,32 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { auth } from '@/lib/auth'
+import { requireAuth, handleAuthError } from '@/lib/authorization'
+import { handleApiError } from '@/lib/validation'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
+    const session = await requireAuth()
+    const spaceId = request.nextUrl.searchParams.get('spaceId')
 
     const payload = await getPayload({ config })
 
-    // Task Analytics
-    const allTasks = await payload.find({ collection: 'tasks', limit: 1000 })
+    // Build where clause for user-scoped data
+    const baseWhere = spaceId 
+      ? { space: { equals: spaceId } }
+      : {
+          or: [
+            { owner: { equals: session.user.id } },
+            { 'members.user': { equals: session.user.id } },
+          ],
+        }
+
+    // Task Analytics (space-scoped or user-scoped)
+    const allTasks = await payload.find({ 
+      collection: 'tasks',
+      where: baseWhere,
+      limit: 1000 
+    })
     const tasks = allTasks.docs
 
     const tasksByStatus: Record<string, number> = {}
@@ -30,8 +43,12 @@ export async function GET() {
       t => t.status === 'done' && new Date(t.updatedAt) > weekAgo
     ).length
 
-    // Agent Analytics
-    const allUsage = await payload.find({ collection: 'agent-usage', limit: 1000 })
+    // Agent Analytics (user-scoped)
+    const allUsage = await payload.find({ 
+      collection: 'agent-usage',
+      where: { user: { equals: session.user.id } },
+      limit: 1000 
+    })
     const usageDocs = allUsage.docs
 
     const avgResponseTime = usageDocs.length > 0
@@ -42,9 +59,10 @@ export async function GET() {
       ? (usageDocs.filter(d => d.success).length / usageDocs.length) * 100
       : 100
 
-    // Space Activity
+    // Activity (space-scoped or user-scoped)
     const allActivities = await payload.find({
       collection: 'activities',
+      where: spaceId ? { space: { equals: spaceId } } : undefined,
       sort: '-createdAt',
       limit: 100,
     })
@@ -79,7 +97,9 @@ export async function GET() {
       },
     })
   } catch (error) {
-    console.error('Failed to fetch analytics:', error)
-    return NextResponse.json({ error: 'Internal error' }, { status: 500 })
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error)
+    }
+    return handleApiError(error)
   }
 }

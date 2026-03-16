@@ -1,22 +1,21 @@
-import { NextResponse } from 'next/server'
+import { NextResponse, NextRequest } from 'next/server'
 import { getPayload } from 'payload'
 import config from '@payload-config'
-import { auth } from '@/lib/auth'
+import { requireAuth, requireOwnership, handleAuthError } from '@/lib/authorization'
+import { validateBody, handleApiError } from '@/lib/validation'
+import { chatMessageSchema } from '@/lib/validation/schemas'
+import { validateWebhookUrl } from '@/lib/url-validator'
 import { runAgent } from '@/lib/agents/runner'
 
 interface RouteParams {
   params: Promise<{ agentId: string }>
 }
 
-export async function POST(request: Request, { params }: RouteParams) {
+export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
-    const session = await auth()
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
+    const session = await requireAuth()
     const { agentId } = await params
-    const body = await request.json()
+    const body = await validateBody(chatMessageSchema, request)
     const payload = await getPayload({ config })
 
     // Fetch agent config
@@ -25,8 +24,27 @@ export async function POST(request: Request, { params }: RouteParams) {
       id: agentId,
     })
 
-    if (!agent || !agent.active) {
-      return NextResponse.json({ error: 'Agent not found or inactive' }, { status: 404 })
+    if (!agent) {
+      return NextResponse.json({ error: { code: 'NOT_FOUND', message: 'Agent not found' } }, { status: 404 })
+    }
+
+    if (!agent.active) {
+      return NextResponse.json({ error: { code: 'FORBIDDEN', message: 'Agent is inactive' } }, { status: 403 })
+    }
+
+    // Check ownership
+    const ownerId = typeof agent.owner === 'string' ? agent.owner : agent.owner?.id
+    await requireOwnership(session.user.id, ownerId)
+
+    // Validate webhook URL if present (SSRF protection)
+    if (agent.config?.webhookUrl) {
+      const validation = validateWebhookUrl(agent.config.webhookUrl)
+      if (!validation.valid) {
+        return NextResponse.json(
+          { error: { code: 'VALIDATION_ERROR', message: `Invalid webhook URL: ${validation.reason}` } },
+          { status: 400 }
+        )
+      }
     }
 
     const startTime = Date.now()
@@ -44,7 +62,10 @@ export async function POST(request: Request, { params }: RouteParams) {
           webhookUrl: agent.config?.webhookUrl || undefined,
         },
       },
-      { messages: body.messages || [] }
+      { 
+        messages: [{ role: 'user', content: body.message }],
+        context: body.context,
+      }
     )
 
     const durationMs = Date.now() - startTime
@@ -72,10 +93,10 @@ export async function POST(request: Request, { params }: RouteParams) {
       durationMs,
     })
   } catch (error) {
+    if (error instanceof Error && error.name === 'AuthError') {
+      return handleAuthError(error)
+    }
     console.error('Agent chat failed:', error)
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : 'Agent error' },
-      { status: 500 }
-    )
+    return handleApiError(error)
   }
 }

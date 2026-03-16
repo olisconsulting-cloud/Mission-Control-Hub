@@ -1,4 +1,5 @@
 name: CI
+
 on:
   push:
     branches: [main, master]
@@ -8,17 +9,75 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: mission_control_test
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'npm'
-      - run: npm ci
-      - run: npx tsc --noEmit
-      - run: npx next lint
-      - run: npm run build
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run type checking
+        run: npx tsc --noEmit
+
+      - name: Run linting
+        run: npx next lint
+
+      - name: Run tests
+        run: npm test -- --coverage
         env:
-          DATABASE_URL: 'postgresql://localhost:5432/test'
-          NEXTAUTH_SECRET: 'ci-test-secret'
-          PAYLOAD_SECRET: 'ci-test-payload-secret'
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/mission_control_test
+          REDIS_URL: redis://localhost:6379
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET || 'ci-test-secret' }}
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET || 'ci-test-payload-secret' }}
+          NODE_ENV: test
+
+      - name: Upload coverage reports
+        uses: codecov/codecov-action@v3
+        with:
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Build
+        run: npm run build
+        env:
+          DATABASE_URL: postgresql://postgres:test_password@localhost:5432/mission_control_test
+          NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET || 'ci-test-secret' }}
+          PAYLOAD_SECRET: ${{ secrets.PAYLOAD_SECRET || 'ci-test-payload-secret' }}
+
+      - name: Check build output
+        run: |
+          if [ ! -d ".next" ]; then
+            echo "Build output directory not found"
+            exit 1
+          fi

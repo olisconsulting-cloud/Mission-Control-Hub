@@ -18,6 +18,7 @@ import { KanbanColumn } from './KanbanColumn'
 import { TaskCard } from './TaskCard'
 import { useKanban } from '@/hooks/useKanban'
 import { COLUMNS, type ColumnId, type Task } from '@/types/task'
+import { BoardSkeleton } from '@/components/ui/Skeleton'
 
 interface KanbanBoardProps {
   spaceId: string
@@ -30,7 +31,11 @@ export function KanbanBoard({ spaceId }: KanbanBoardProps) {
   const [addingTo, setAddingTo] = useState<ColumnId | null>(null)
 
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(PointerSensor, { 
+      activationConstraint: { 
+        distance: 5 // 5px threshold to prevent accidental drags
+      } 
+    }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
   )
 
@@ -80,13 +85,7 @@ export function KanbanBoard({ spaceId }: KanbanBoardProps) {
   }
 
   if (loading) {
-    return (
-      <div className="flex gap-4 overflow-x-auto p-4">
-        {COLUMNS.map(col => (
-          <div key={col.id} className="w-72 h-96 rounded-xl bg-surface-900 animate-pulse shrink-0" />
-        ))}
-      </div>
-    )
+    return <BoardSkeleton />
   }
 
   return (
@@ -97,7 +96,7 @@ export function KanbanBoard({ spaceId }: KanbanBoardProps) {
       onDragOver={handleDragOver}
       onDragEnd={handleDragEnd}
     >
-      <div className="flex gap-4 overflow-x-auto pb-4">
+      <div className="flex gap-4 overflow-x-auto pb-4" aria-label="Kanban board">
         {COLUMNS.map(col => (
           <div key={col.id} className="flex flex-col">
             <KanbanColumn
