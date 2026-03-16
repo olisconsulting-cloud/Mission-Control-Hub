@@ -4,16 +4,14 @@ import GitHub from 'next-auth/providers/github'
 export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     GitHub({
-      clientId: process.env.AUTH_GITHUB_ID!},
-      clientSecret: process.env.AUTH_GITHUB_SECRET!},
+      clientId: process.env.AUTH_GITHUB_ID!,
+      clientSecret: process.env.AUTH_GITHUB_SECRET!,
     }),
   ],
   callbacks: {
-    session: ({ session, token }) => (
-      {
-        ...session,
-        user: { ...session.user, id: token.sub },
-      }
-    ),
+    session: ({ session, token }) => ({
+      ...session,
+      user: { ...session.user, id: token.sub },
+    }),
   },
 })
