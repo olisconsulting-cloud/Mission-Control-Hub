@@ -4,49 +4,32 @@ import config from "@/payload/payload.config"
 
 export const maxDuration = 60
 
-export async function GET(request: Request) {
-  const url = new URL(request.url)
-  const setup = url.searchParams.get("setup")
-  
+export async function GET() {
   const checks: Record<string, any> = {}
-  checks.dbUrlSet = !!process.env.DATABASE_URL
 
   try {
     const payload = await getPayload({ config })
+    checks.init = "ok"
     
-    if (setup === "true") {
-      try {
-        // @ts-ignore - push exists on the db adapter
-        if (typeof payload.db.push === "function") {
-          await payload.db.push({ forceAcceptWarning: true })
-          checks.setup = "schema pushed successfully"
-        } else {
-          checks.setup = "push not available, trying createMigration"
-          await payload.db.createMigration({ forceAcceptWarning: true })
-          await payload.db.migrate()
-          checks.setup = "migration completed"
-        }
-      } catch (setupErr: any) {
-        checks.setup = { error: setupErr?.message?.substring(0, 500) }
-      }
-    }
-
     try {
       const result = await payload.find({ collection: "users", limit: 1 })
-      checks.database = { status: "connected", userCount: result.totalDocs }
-    } catch (queryErr: any) {
-      checks.database = { status: "query_error", message: queryErr?.message?.substring(0, 300) }
+      checks.db = { status: "healthy", count: result.totalDocs }
+    } catch (e: any) {
+      checks.db = { 
+        status: "error", 
+        message: e?.message?.substring(0, 1000),
+        cause: e?.cause?.message?.substring(0, 500),
+        code: e?.code,
+      }
     }
-  } catch (error: any) {
-    checks.database = { status: "init_error", message: error?.message?.substring(0, 500) }
+  } catch (e: any) {
+    checks.init = { 
+      error: e?.message?.substring(0, 1000),
+      cause: e?.cause?.message?.substring(0, 500),
+    }
   }
 
-  const healthy = checks.database?.status === "connected"
-  
-  return NextResponse.json({
-    status: healthy ? "healthy" : "unhealthy",
-    checks,
-    timestamp: new Date().toISOString(),
-  }, { status: healthy ? 200 : 503 })
+  const ok = checks.db?.status === "healthy"
+  return NextResponse.json({ status: ok ? "healthy" : "unhealthy", checks }, { status: ok ? 200 : 503 })
 }
 
